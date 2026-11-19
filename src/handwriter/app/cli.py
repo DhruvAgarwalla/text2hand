@@ -130,6 +130,42 @@ def learn(
                f"Use with: --style profile:{key}")
 
 
+@app.command("train-recognizer")
+def train_recognizer_cmd(
+    per_class: int = typer.Option(300, help="Synthetic samples per character."),
+    epochs: int = typer.Option(10, help="Training epochs."),
+    seed: int = typer.Option(0, help="Random seed."),
+) -> None:
+    """Train the letter recogniser (CPU, a few minutes) used to improve handwriting capture."""
+    try:
+        from handwriter.ml.recognizer import train_recognizer
+    except ImportError as e:  # pragma: no cover
+        raise typer.BadParameter("Install PyTorch first (see README).") from e
+    info = train_recognizer(per_class=per_class, epochs=epochs, seed=seed, log=typer.echo)
+    typer.echo(f"Saved {info['path']} (validation accuracy {info['val_acc']:.1%}, "
+               f"{info['seconds']:.0f}s)")
+
+
+@app.command()
+def evaluate(
+    styles: list[str] = typer.Argument(None, help="Styles to evaluate (default: all)."),
+    messiness: float = typer.Option(1.0, help="Messiness to evaluate at."),
+) -> None:
+    """Measure line fit, letter variation, legibility and speed for each style."""
+    from handwriter.ml.evaluate import evaluate_style
+    from handwriter.styles import available_styles
+
+    keys = styles or [k for _, k in available_styles()]
+    typer.echo(f"{'style':<24}{'line fit':>10}{'worst':>8}{'variation':>11}"
+               f"{'legible@1':>11}{'@3':>7}{'s/page':>8}")
+    for key in keys:
+        r = evaluate_style(key, messiness)
+        leg1 = f"{r.legibility_top1:.0%}" if r.legibility_top1 is not None else "n/a"
+        leg3 = f"{r.legibility_top3:.0%}" if r.legibility_top3 is not None else "n/a"
+        typer.echo(f"{key:<24}{r.line_fit_mean:>10.3f}{r.line_fit_worst:>8.3f}"
+                   f"{r.variation:>11.3f}{leg1:>11}{leg3:>7}{r.seconds_per_page:>8.1f}")
+
+
 @app.command()
 def web(
     port: int = typer.Option(7860, help="Port for the local web app."),

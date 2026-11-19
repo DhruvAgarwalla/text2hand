@@ -38,10 +38,12 @@ desktop.ini
 profiles/*
 !profiles/.gitkeep
 
-# Trained model checkpoints (large)
+# Trained model checkpoints (large); the small letter recogniser is shipped
 models/*
 !models/.gitkeep
+!models/letter_recognizer.pt
 *.pt
+!models/letter_recognizer.pt
 *.pth
 *.ckpt
 *.onnx

@@ -35,7 +35,8 @@ class CharCut:
 
 
 def segment_word(seg: Segmentation, box: WordBox, text: str, cursive: bool,
-                 char_width: Callable[[str], float]) -> list[CharCut]:
+                 char_width: Callable[[str], float], recognizer=None,
+                 ink_radius: float = 0.0) -> list[CharCut]:
     chars = [c for c in text if not c.isspace()]
     if not chars:
         return []
@@ -60,7 +61,13 @@ def segment_word(seg: Segmentation, box: WordBox, text: str, cursive: bool,
         cut_cost = _cursive_cut_cost(col, py - base, width, line.xheight)
     else:
         cut_cost = _print_cut_cost(prof)
-    bounds, cost = _dp_cuts(cut_cost, expected)
+    if recognizer is not None and not cursive and _gap_count(prof) == len(chars) - 1:
+        recognizer = None  # letters already separated by clean gaps: geometry suffices
+    if recognizer is not None and len(chars) > 1:
+        bounds, cost = _recognition_cuts(recognizer, chars, cut_cost, expected, ds - d_min,
+                                         py - (base - ink_radius), line.xheight)
+    else:
+        bounds, cost = _dp_cuts(cut_cost, expected)
 
     # Assign ink to letters.
     seg_of_pixel = np.clip(np.searchsorted(bounds, ds - d_min, side="right") - 1, 0,
@@ -81,6 +88,16 @@ def segment_word(seg: Segmentation, box: WordBox, text: str, cursive: bool,
                             origin_x=d_min + bounds[k], advance_px=bounds[k + 1] - bounds[k],
                             cost=cost / len(chars)))
     return cuts
+
+
+def _gap_count(prof: np.ndarray) -> int:
+    """Number of blank column runs strictly inside the word."""
+    ink = prof >= 0.5
+    idx = np.nonzero(ink)[0]
+    if len(idx) == 0:
+        return 0
+    inner = ink[idx[0] : idx[-1] + 1]
+    return int(np.sum(inner[:-1] & ~inner[1:]))  # ink -> blank transitions inside the word
 
 
 def _print_cut_cost(prof: np.ndarray) -> np.ndarray:
@@ -144,6 +161,83 @@ def _dp_cuts(cut_cost: np.ndarray, expected: np.ndarray) -> tuple[np.ndarray, fl
         pos -= back[k, pos]
         bounds.append(pos)
     return np.array(bounds[::-1], dtype=np.float64), float(dp[k_total, w])
+
+
+def _recognition_cuts(recognizer, chars: list[str], cut_cost: np.ndarray, expected: np.ndarray,
+                      rel_x: np.ndarray, rel_y: np.ndarray, xheight: float,
+                      weight: float = 0.5) -> tuple[np.ndarray, float]:
+    """DP over candidate cut positions, scoring each letter band with the recogniser.
+
+    total = sum(width deviation + cut cost - weight * log P(letter | band image))
+    """
+    from handwriter.ml.features import CLASS_OF, raster
+
+    w = len(cut_cost)
+    k_total = len(chars)
+    # Candidate cuts: local minima of the cut cost plus a coarse regular grid.
+    inner = np.arange(1, w - 1)
+    is_min = (cut_cost[inner] <= cut_cost[inner - 1]) & (cut_cost[inner] <= cut_cost[inner + 1])
+    minima = inner[is_min]
+    # keep the best minima, at least 3 px apart
+    keep: list[int] = []
+    for m in minima[np.argsort(cut_cost[minima])]:
+        if all(abs(m - k) >= 3 for k in keep):
+            keep.append(int(m))
+        if len(keep) >= 2 * k_total + 4:
+            break
+    extra = np.array([], np.int64)
+    if len(keep) < k_total + 2:  # too few natural cut points: add a coarse grid
+        step = max(3, int(xheight * 0.35))
+        extra = np.arange(step, w - 1, step)
+    cand = np.unique(np.concatenate([[0, w], keep, extra])).astype(np.int64)
+    n = len(cand)
+
+    emin, emax = expected.min(), expected.max()
+    order = np.argsort(rel_x)
+    sx, sy = rel_x[order], rel_y[order]
+    pairs, images = [], []
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            span = cand[j] - cand[i]
+            if span < 0.25 * emin:
+                continue
+            if span > 2.6 * emax:
+                break
+            lo, hi = np.searchsorted(sx, cand[i]), np.searchsorted(sx, cand[j])
+            images.append(raster(sx[lo:hi], sy[lo:hi], (cand[i] + cand[j]) / 2, xheight))
+            pairs.append((i, j))
+    if not pairs:
+        return _dp_cuts(cut_cost, expected)
+    lp = recognizer.log_probs(np.stack(images))
+    cls = [CLASS_OF.get(c, -1) for c in chars]
+
+    inf = 1e18
+    dp = np.full((k_total + 1, n), inf)
+    back = np.full((k_total + 1, n), -1, np.int64)
+    dp[0, 0] = 0.0
+    for k in range(1, k_total + 1):
+        e = expected[k - 1]
+        for p, (i, j) in enumerate(pairs):
+            if dp[k - 1, i] >= inf:
+                continue
+            if (k < k_total and j == n - 1) or (k == k_total and j != n - 1):
+                continue
+            span = cand[j] - cand[i]
+            if not 0.3 * e <= span <= 2.6 * e:
+                continue
+            c = dp[k - 1, i] + ((span - e) / e) ** 2
+            c += cut_cost[cand[j]] if j < n - 1 else 0.0
+            if cls[k - 1] >= 0:
+                c -= weight * max(float(lp[p, cls[k - 1]]), -12.0)
+            if c < dp[k, j]:
+                dp[k, j] = c
+                back[k, j] = i
+    if dp[k_total, n - 1] >= inf:
+        return _dp_cuts(cut_cost, expected)
+    idx = [n - 1]
+    for k in range(k_total, 0, -1):
+        idx.append(back[k, idx[-1]])
+    return cand[np.array(idx[::-1])].astype(np.float64), float(dp[k_total, n - 1])
 
 
 def _assign_components(comp_ids: np.ndarray, ds: np.ndarray, bounds: np.ndarray,

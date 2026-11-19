@@ -190,6 +190,23 @@ Document creator/
 | 8 | ML variation model | VAE pre-train + per-user fine-tune on CPU |
 | 9 | Evaluation + polish | Metrics, visual regression tests, docs, samples |
 
+### Status (2026-11-19)
+
+All iterations 0–9 implemented (local commits). Changes from the original plan:
+
+* **Iteration 8 ML**: built a **CNN letter recogniser** first instead of the glyph VAE.
+  Testing showed letter segmentation, not letter variety, was the main quality limit. The
+  recogniser is trained on synthetic data from the app's own imperfection engine (no
+  dataset download) and guides/validates letter cuts. The **VAE variation model is
+  deferred** to a later iteration.
+* Character segmentation uses DP + recogniser scoring instead of a pretrained CTC model
+  (no large download, CPU-fast).
+* Letter-shape plausibility checks and a two-pass self-calibration of letter widths were
+  added to capture.
+
+Next ideas: glyph VAE for extra variety, word-level samples for cursive joins, a
+full-sequence handwriting model when a GPU is available, vector-stroke PDF output.
+
 ## 7. Quality checks
 - **Legibility**: OCR read-back of generated pages (character error rate).
 - **Line alignment**: baseline-to-rule distance; no collisions between lines.

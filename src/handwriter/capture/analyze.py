@@ -47,6 +47,7 @@ class CapturedGlyph:
     word: str
     suspect: bool  # failed a plausibility check: excluded unless the user keeps it
     reason: str = ""
+    confidence: float | None = None  # recogniser's P(letter) when available
 
 
 @dataclass
@@ -82,12 +83,14 @@ def _width_prior(style: str):
 
 
 def analyze_page(path: str | Path, transcript: str, style: str = "print",
-                 page_index: int = 0) -> CaptureResult:
+                 page_index: int = 0, use_ml: bool = True) -> CaptureResult:
     rgb = load_page_image(path, page_index)
-    return analyze_image(rgb, transcript, style)
+    return analyze_image(rgb, transcript, style, use_ml)
 
 
-def analyze_image(rgb: np.ndarray, transcript: str, style: str = "print") -> CaptureResult:
+def analyze_image(rgb: np.ndarray, transcript: str, style: str = "print",
+                  use_ml: bool = True) -> CaptureResult:
+    """Learn letter samples. use_ml: use the letter recogniser if it is installed/trained."""
     if style not in ("print", "cursive"):
         raise ValueError("style must be 'print' or 'cursive'")
     page = extract_ink(rgb)
@@ -107,10 +110,16 @@ def analyze_image(rgb: np.ndarray, transcript: str, style: str = "print") -> Cap
 
     r_ref = _ink_radius(page.ink)
     cursive = style == "cursive"
-    captured, cuts_by_word = _learn(seg, matches, words, width, cursive, r_ref)
-    # Second pass: re-split words using this writer's own measured letter widths.
+    rec = None
+    if use_ml:
+        from handwriter.ml.recognizer import get_recognizer
+
+        rec = get_recognizer()
+    # First pass: geometry-only cuts (fast) to measure this writer's letter widths.
+    captured, cuts_by_word = _learn(seg, matches, words, width, cursive, r_ref, None, rec)
+    # Second pass: re-split words with the writer's own widths, guided by the recogniser.
     refined = _refined_widths(captured, width)
-    captured2, cuts2 = _learn(seg, matches, words, refined, cursive, r_ref)
+    captured2, cuts2 = _learn(seg, matches, words, refined, cursive, r_ref, rec, rec)
     if sum(not c.suspect for c in captured2) >= sum(not c.suspect for c in captured):
         captured, cuts_by_word = captured2, cuts2
 
@@ -140,7 +149,9 @@ def _refined_widths(captured: list[CapturedGlyph], prior):
     return width
 
 
-def _learn(seg: Segmentation, matches, words: list[str], width, cursive: bool, r_ref: float):
+def _learn(seg: Segmentation, matches, words: list[str], width, cursive: bool, r_ref: float,
+           rec=None, verifier=None):
+    """Cut matched words into letters. rec guides the cuts; verifier checks the results."""
     t = np.tan(np.deg2rad(seg.slant_deg))
     captured: list[CapturedGlyph] = []
     cuts_by_word = []
@@ -152,17 +163,21 @@ def _learn(seg: Segmentation, matches, words: list[str], width, cursive: bool, r
         text = words[match.words[0]]
         if match.cost > 0.45:
             continue
-        cuts = segment_word(seg, box, text, cursive, width)
+        cuts = segment_word(seg, box, text, cursive, width, rec, r_ref)
         cuts_by_word.append((match.boxes[0], cuts, text))
         line = seg.lines[box.line]
         word_glyphs = []
+        kept_cuts = []
         for cut in cuts:
             g = _cut_to_glyph(cut, line, r_ref, t)
             if g is None:
                 continue
             reason = _implausible(g)
             word_glyphs.append(CapturedGlyph(next_id, g, text, bool(reason), reason))
+            kept_cuts.append(cut)
             next_id += 1
+        if verifier is not None:
+            _verify(verifier, word_glyphs, kept_cuts, line, r_ref, t)
         bad = sum(c.suspect for c in word_glyphs)
         if word_glyphs and bad / len(word_glyphs) > 0.4:
             for c in word_glyphs:  # probably misaligned: distrust the whole word
@@ -177,6 +192,31 @@ def _learn(seg: Segmentation, matches, words: list[str], width, cursive: bool, r
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
+
+def _verify(rec, glyphs: list[CapturedGlyph], cuts: list[CharCut], line, r_ref: float,
+            t: float) -> None:
+    """Ask the recogniser whether each cut-out looks like its letter."""
+    from handwriter.ml.features import CLASS_OF, raster
+
+    if not glyphs:
+        return
+    images = []
+    for cut in cuts:
+        yy, xx = np.nonzero(cut.mask)
+        x, y = xx + cut.x0, yy + cut.y0
+        base = line.base_y(x) - r_ref
+        ds = x + t * (y - base)
+        images.append(raster(ds, y - base, cut.origin_x + cut.advance_px / 2, line.xheight))
+    lp = rec.log_probs(np.stack(images))
+    for c, row in zip(glyphs, lp, strict=True):
+        cls = CLASS_OF.get(c.glyph.char)
+        if cls is None:
+            continue
+        c.confidence = float(np.exp(row[cls]))
+        rank = int((row > row[cls]).sum())
+        if not c.suspect and rank >= 5 and c.confidence < 0.01:
+            c.suspect, c.reason = True, "does not look like this letter"
 
 
 def _ink_radius(ink: np.ndarray) -> float:

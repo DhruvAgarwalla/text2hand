@@ -30,6 +30,7 @@ class FontGlyphSource:
         self._cache: dict[str, Glyph | None] = {}
         self.space_advance = self.font.getlength(" ") / self.xh_px
         self.ref_radius = self._reference_radius()
+        self.baseline_shift = self._baseline_shift()
 
     # -- public API ----------------------------------------------------------
     def has(self, ch: str) -> bool:
@@ -63,12 +64,25 @@ class FontGlyphSource:
                 radii.extend(r for s in raw for r in s.radius)
         return float(np.median(radii)) if radii else self.xh_px * 0.06
 
+    def _baseline_shift(self) -> float:
+        """Where the centre-lines of short letters actually end, relative to the baseline.
+
+        Usually about one ink radius above it, but some script fonts sit letters below
+        their own baseline. Shifting by the measured value puts every style's letters
+        exactly on the line (the pen radius is added back at layout).
+        """
+        bottoms = []
+        for ch in "acemnorsuvwxz":
+            if self.has(ch):
+                raw, _, oy = self._raw_strokes(ch)
+                if raw:
+                    bottoms.append(max(s.points[:, 1].max() for s in raw) - oy)
+        return float(np.median(bottoms)) if bottoms else -self.ref_radius
+
     def _extract(self, ch: str) -> Glyph:
         raw, ox, oy = self._raw_strokes(ch)
         xh = self.xh_px
-        # The centre-line of ink resting on the baseline lies one ink radius above it;
-        # shift down so the centre-line sits on y = 0 (the pen radius is added at layout).
-        oy -= self.ref_radius
+        oy += self.baseline_shift  # put the centre-line baseline at y = 0
         strokes = [
             Stroke(
                 points=np.column_stack([(s.points[:, 0] - ox) / xh, (s.points[:, 1] - oy) / xh]),
