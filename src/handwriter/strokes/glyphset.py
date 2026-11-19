@@ -73,6 +73,18 @@ class GlyphSet:
             return options[0]
         return options[int(rng.integers(len(options)))]
 
+    def vertical_extent(self) -> float:
+        """Typical ascender height + descender depth, in x-height units."""
+        asc = [-g.bbox()[1] for c in "bdhklAHT" if (g := self.get(c)) is not None]
+        desc = [g.bbox()[3] for c in "gjpqy" if (g := self.get(c)) is not None]
+        a = float(np.median(asc)) if asc else 1.5
+        d = float(np.median(desc)) if desc else 0.6
+        return a + d
+
+    def max_size(self) -> float:
+        """Largest x-height/line-spacing ratio before lines start colliding."""
+        return 1.05 / max(self.vertical_extent(), 1.5)
+
     def missing(self, chars: str) -> list[str]:
         return sorted({c for c in chars if not c.isspace() and self.provider_for(c) is None})
 

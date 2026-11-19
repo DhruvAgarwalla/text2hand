@@ -66,6 +66,9 @@ class FontGlyphSource:
     def _extract(self, ch: str) -> Glyph:
         raw, ox, oy = self._raw_strokes(ch)
         xh = self.xh_px
+        # The centre-line of ink resting on the baseline lies one ink radius above it;
+        # shift down so the centre-line sits on y = 0 (the pen radius is added at layout).
+        oy -= self.ref_radius
         strokes = [
             Stroke(
                 points=np.column_stack([(s.points[:, 0] - ox) / xh, (s.points[:, 1] - oy) / xh]),
@@ -74,9 +77,29 @@ class FontGlyphSource:
             )
             for s in raw
         ]
+        if ch in _ASCENDER_LETTERS:
+            _stretch_ascender(strokes, target=_MIN_ASCENDER)
         advance = self.font.getlength(ch) / xh
         entry, exit_ = find_anchors(strokes)
         return Glyph(ch, strokes, advance, entry, exit_, source=self.name)
+
+
+_ASCENDER_LETTERS = set("bdfhkl")  # not 't': it is naturally shorter
+_MIN_ASCENDER = 1.45
+
+
+def _stretch_ascender(strokes: list[Stroke], target: float) -> None:
+    """Some script fonts draw 'l', 'b', 'k'... barely taller than 'e', which hurts
+    legibility. Stretch the part above mid x-height so the ascender reaches ``target``."""
+    top = -min(s.points[:, 1].min() for s in strokes)
+    pivot = 0.5
+    if top >= target - 0.08 or top <= pivot + 0.1:
+        return
+    k = (target - pivot) / (top - pivot)
+    for s in strokes:
+        y = s.points[:, 1]
+        above = y < -pivot
+        y[above] = -pivot + (y[above] + pivot) * k
 
 
 def _xheight(font: ImageFont.FreeTypeFont) -> float:
