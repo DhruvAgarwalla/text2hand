@@ -55,7 +55,8 @@ class GlyphSet:
 
     @property
     def space_advance(self) -> float:
-        return self.primary.space_advance
+        # Handwritten word gaps are roughly one x-height; some fonts use far less.
+        return max(self.primary.space_advance, 0.95)
 
     def provider_for(self, ch: str) -> GlyphProvider | None:
         for p in [self.primary, *self.fallbacks]:
