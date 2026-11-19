@@ -32,7 +32,12 @@ class Paragraph:
     indent: int = 0  # number of leading spaces
 
 
+_INVISIBLE = dict.fromkeys(map(ord, "﻿​‌‍⁠­"), None)
+_SPACES = dict.fromkeys(map(ord, "     　"), " ")
+
+
 def parse_text(text: str) -> list[Paragraph]:
+    text = text.translate(_INVISIBLE).translate(_SPACES)
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ")
     return [_parse_line(line) for line in text.split("\n")]
 

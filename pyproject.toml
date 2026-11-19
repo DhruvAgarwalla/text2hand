@@ -43,3 +43,4 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B008"]  # Typer/Gradio use calls in argument defaults by design
