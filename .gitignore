@@ -1,0 +1,62 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Tooling caches ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Secrets ---
+.env
+.env.*
+
+# --- Project data (user-specific / large) ---
+# User handwriting profiles contain personal handwriting: never commit
+profiles/*
+!profiles/.gitkeep
+
+# Trained model checkpoints (large)
+models/*
+!models/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Generated documents & uploads
+output/
+uploads/
+*.pdf
+*.docx
+!samples/**/*.pdf
+!samples/**/*.docx
+
+# Datasets downloaded for training
+data/
+
+# Gradio temp files
+.gradio/
+flagged/
