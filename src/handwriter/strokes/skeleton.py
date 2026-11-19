@@ -276,7 +276,7 @@ def _smooth(
     w = min(window, n if closed else max(2, n // 2))
     kernel = np.ones(w) / w
     if closed:
-        pad = w
+        pad = min(w, n - 1)
         ext = np.concatenate([pts[-pad - 1 : -1], pts, pts[1 : pad + 1]])
         sm = np.stack([np.convolve(ext[:, k], kernel, mode="same") for k in range(2)], 1)
         return sm[pad:-pad], rad

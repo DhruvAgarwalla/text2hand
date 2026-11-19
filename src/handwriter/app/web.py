@@ -57,7 +57,7 @@ def generate(text, style, page, bg_file, messiness, size, slant, word_spacing, p
         size=size,
         slant_deg=slant if slant else None,
         word_spacing=word_spacing,
-        pen_mm=pen,
+        pen_mm=pen if pen and pen >= 0.1 else None,
         ink=ink,
         seed=int(seed) if seed else None,
         line_spacing_mm=_num(cal_spacing),
@@ -136,7 +136,8 @@ def write_tab():
                 word_spacing = gr.Slider(0.6, 1.8, value=1.0, step=0.05, label="Word spacing")
             with gr.Accordion("Pen & ink", open=False):
                 ink = gr.Dropdown(list(INK_COLORS), value="blue", label="Ink")
-                pen = gr.Slider(0.15, 1.0, value=0.38, step=0.01, label="Pen width (mm)")
+                pen = gr.Slider(0.0, 1.0, value=0.0, step=0.01, label="Pen width (mm)",
+                                info="0 = automatic (your own pen width for profiles)")
                 seed = gr.Number(value=0, precision=0, label="Seed (0 = random)")
             with gr.Accordion("Page calibration (mm, blank = automatic)", open=False):
                 with gr.Row():
@@ -171,14 +172,11 @@ def build_app() -> gr.Blocks:
                     "A4 pages: built-in styles or your own handwriting.")
         with gr.Tabs():
             with gr.Tab("Write"):
-                write_tab()
+                style_dropdown = write_tab()
             with gr.Tab("My handwriting"):
-                try:
-                    from handwriter.app.profile_ui import profile_tab
-                except ImportError:
-                    gr.Markdown("Coming soon.")
-                else:
-                    profile_tab()
+                from handwriter.app.profile_ui import profile_tab
+
+                profile_tab(style_dropdown)
     return demo
 
 

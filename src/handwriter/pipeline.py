@@ -16,13 +16,15 @@ from handwriter.render.pen import INK_COLORS, composite, draw_strokes, ink_textu
 from handwriter.strokes.glyphset import GlyphSet, builtin_glyphset
 from handwriter.templates.pages import PageSpec, make_page
 
+DEFAULT_PEN_MM = 0.38
+
 
 class RenderSettings(BaseModel):
     style: str = "print"  # built-in style key or "profile:<name>"
     page: str = "ruled-college"  # built-in template key (ignored with custom backgrounds)
     messiness: float = Field(1.0, ge=0.0, le=3.0)
     size: float = Field(0.40, ge=0.15, le=0.7, description="x-height / line spacing")
-    pen_mm: float = Field(0.38, ge=0.1, le=1.5)
+    pen_mm: float | None = Field(None, ge=0.1, le=1.5, description="None = style default")
     ink: str = "blue"
     slant_deg: float | None = None
     word_spacing: float = 1.0
@@ -82,14 +84,20 @@ def render_pages(
 
     hand_kwargs = dict(gs.defaults)
     hand_kwargs["messiness"] = s.messiness
-    hand_kwargs["word_spacing"] = s.word_spacing
+    hand_kwargs["word_spacing"] = hand_kwargs.get("word_spacing", 1.0) * s.word_spacing
     if s.slant_deg is not None:
         hand_kwargs["slant_deg"] = s.slant_deg
     params = HandParams(**hand_kwargs)
 
     factory = page_factory or builtin_page_factory(s)
-    pen_px = s.pen_mm / 25.4 * s.dpi
     size = min(s.size, gs.max_size())
+    if s.pen_mm is not None:
+        pen_px = s.pen_mm / 25.4 * s.dpi
+    elif gs.pen_ratio:
+        xh_px = factory(0).line_spacing * size
+        pen_px = float(np.clip(gs.pen_ratio * xh_px, 0.15 / 25.4 * s.dpi, 0.9 / 25.4 * s.dpi))
+    else:
+        pen_px = DEFAULT_PEN_MM / 25.4 * s.dpi
     result = layout_text(text, gs, params, factory, size=size, pen_px=pen_px, rng=rng)
 
     ink_rgb = INK_COLORS.get(s.ink, INK_COLORS["blue"])

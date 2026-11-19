@@ -52,9 +52,13 @@ class GlyphSet:
     cursive: bool = False
     # Default handwriting parameters that suit this style (merged into HandParams).
     defaults: dict = field(default_factory=dict)
+    # Natural pen width as a fraction of x-height (measured for user profiles).
+    pen_ratio: float | None = None
 
     @property
     def space_advance(self) -> float:
+        if self.primary.name.startswith("profile:"):
+            return self.primary.space_advance  # measured from the user's own page
         # Handwritten word gaps are roughly one x-height; some fonts use far less.
         return max(self.primary.space_advance, 0.95)
 

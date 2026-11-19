@@ -63,7 +63,7 @@ def render(
     background: Path | None = typer.Option(None, help="Scanned page (PDF/image) to write on."),
     messiness: float = typer.Option(1.0, help="0 = very neat ... 2.5 = very messy."),
     size: float = typer.Option(0.40, help="Letter x-height as a fraction of line spacing."),
-    pen: float = typer.Option(0.38, help="Pen width in mm."),
+    pen: float | None = typer.Option(None, help="Pen width in mm (default: style's own)."),
     ink: str = typer.Option("blue", help="Ink colour."),
     slant: float | None = typer.Option(None, help="Extra slant in degrees (+ leans right)."),
     seed: int | None = typer.Option(None, help="Random seed for reproducible output."),
@@ -88,6 +88,46 @@ def render(
                f"(seed {result.seed})")
     if result.missing:
         typer.echo(f"Warning: no glyph for: {' '.join(result.missing)}", err=True)
+
+
+@app.command()
+def learn(
+    page: Path = typer.Argument(..., help="Photo/scan (image or PDF) of your handwritten page."),
+    text: Path = typer.Option(..., "--text", help="Text file with exactly what you wrote."),
+    name: str = typer.Option(..., "--name", help="Profile name."),
+    style: str = typer.Option("print", help="'print' or 'cursive'."),
+    replace: bool = typer.Option(False, help="Replace the profile instead of adding to it."),
+    review: Path | None = typer.Option(None, help="Save a PNG sheet of learned letters here."),
+) -> None:
+    """Learn (or extend) a handwriting profile from a page + its transcript."""
+    from handwriter.capture.analyze import analyze_page, glyph_sheet
+    from handwriter.capture.profile import (
+        Profile,
+        load_profile,
+        merge_stats,
+        profile_path,
+        safe_name,
+        save_profile,
+    )
+
+    res = analyze_page(page, text.read_text(encoding="utf-8"), style)
+    for w in res.warnings:
+        typer.echo(f"Warning: {w}", err=True)
+    key = safe_name(name)
+    if not replace and profile_path(key).exists():
+        old = load_profile(key)
+        prof = Profile(key, old.style, {k: list(v) for k, v in old.glyphs.items()},
+                       merge_stats(old.stats, res.stats, old.pages), old.pages + 1)
+    else:
+        prof = Profile(key, style, stats=dict(res.stats), pages=1)
+    prof.add(res.accepted())
+    save_profile(prof)
+    if review:
+        glyph_sheet(res.glyphs).save(review)
+    typer.echo(f"Profile '{key}': +{len(res.accepted())} samples "
+               f"({sum(c.suspect for c in res.glyphs)} rejected); now "
+               f"{prof.sample_count()} samples of {len(prof.glyphs)} characters. "
+               f"Use with: --style profile:{key}")
 
 
 @app.command()
