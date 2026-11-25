@@ -149,6 +149,26 @@ pytest -q
 ruff check .
 ```
 
+## Intended use
+
+Text2Hand is a research and personal-productivity project. Good uses include:
+
+* writing out your **own** notes, letters or documents in your own handwriting;
+* mock-ups, design work, and props that are clearly not passed off as real documents;
+* research and teaching on handwriting synthesis, document analysis and OCR, for
+  example generating synthetic training data.
+
+Please **do not** use it to:
+
+* forge signatures or produce documents that impersonate someone else's handwriting;
+* learn another person's handwriting without their clear consent;
+* submit generated pages as handwritten work where handwriting is required, such as
+  exams, assignments or official forms, or anywhere else that would be dishonest;
+* create fraudulent, misleading or legally binding documents.
+
+You are responsible for how you use the output. Check the rules of your institution and
+local law before using generated handwriting anywhere it might be taken as genuine.
+
 ## Privacy
 
 Handwriting profiles (`profiles/`) are git-ignored and stay on your machine. The web app
@@ -159,3 +179,8 @@ runs locally; `--share` is off by default.
 Kalam, Architects Daughter, Cedarville Cursive, Noto Sans and Noto Sans Math (SIL Open Font
 License) and Homemade Apple (Apache 2.0), all from Google Fonts. Licence files are in
 `assets/fonts/`.
+
+## License
+
+The code is released under the [MIT License](LICENSE). The bundled fonts keep their own
+licences (see [Fonts](#fonts)).

@@ -7,6 +7,13 @@ name = "text2hand"
 version = "0.0.1"
 description = "Personalised Handwriting Synthesis from a Single Page via Stroke-Level Modelling: realistic handwritten A4 PDF/DOCX documents, including your own handwriting."
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Dhruv Agarwalla" }]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
