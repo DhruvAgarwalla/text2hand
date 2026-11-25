@@ -166,9 +166,13 @@ def write_tab():
     return style
 
 
+SUBTITLE = "Personalised Handwriting Synthesis from a Single Page via Stroke-Level Modelling"
+
+
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Handwriting Replicator") as demo:
-        gr.Markdown("# ✍️ Handwriting Replicator\nTurn typed text into realistic handwritten "
+    with gr.Blocks(title="Text2Hand") as demo:
+        gr.Markdown("# ✍️ Text2Hand\n*" + SUBTITLE + "*\n\n"
+                    "Turn typed text into realistic handwritten "
                     "A4 pages: built-in styles or your own handwriting.")
         with gr.Tabs():
             with gr.Tab("Write"):

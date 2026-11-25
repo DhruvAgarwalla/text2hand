@@ -24,7 +24,7 @@ def pdf_bytes(images: list[Image.Image], quality: int = 90, dpi: int = 300) -> b
     for img in images:
         page = doc.new_page(width=A4_PT[0], height=A4_PT[1])
         page.insert_image(page.rect, stream=_jpeg(img, quality, dpi))
-    doc.set_metadata({"creator": "Handwriting Replicator", "producer": "handwriter"})
+    doc.set_metadata({"creator": "Text2Hand", "producer": "text2hand"})
     data = doc.tobytes(deflate=True, garbage=3)
     doc.close()
     return data

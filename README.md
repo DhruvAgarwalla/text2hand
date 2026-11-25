@@ -1,4 +1,6 @@
-# Handwriting Replicator
+# Text2Hand
+
+### Personalised Handwriting Synthesis from a Single Page via Stroke-Level Modelling
 
 Turn typed text into realistic handwritten **A4 PDF and DOCX** documents: not the
 perfect, repeated letters of a "handwriting font", but writing with the imperfections of a
@@ -47,9 +49,13 @@ text ──► layout engine ──► glyph source ──► imperfection engin
   class of fragments. It guides segmentation and flags samples that don't look like their
   letter. No dataset download needed.
 
+See [docs/DESIGN.md](docs/DESIGN.md) for the full method, evaluation and limitations.
+
 ## Setup (Windows)
 
 ```powershell
+git clone https://github.com/DhruvAgarwalla/text2hand.git
+cd text2hand
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
@@ -58,6 +64,8 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
 macOS / Linux: use `source .venv/bin/activate`.
+
+The command-line tool is available as both `handwriter` and `text2hand`.
 
 A trained recogniser ships in `models/letter_recognizer.pt` (95% accuracy on held-out
 synthetic letters). To retrain it (about 30 minutes on a laptop CPU):
@@ -131,6 +139,7 @@ src/handwriter/
   app/            CLI and Gradio web app
 assets/fonts/     bundled OFL / Apache handwriting and symbol fonts (licences included)
 tests/            pytest suite
+docs/DESIGN.md    design, method, evaluation and limitations
 ```
 
 ## Development

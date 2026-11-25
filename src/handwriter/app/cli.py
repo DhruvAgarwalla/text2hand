@@ -16,7 +16,7 @@ app = typer.Typer(help="Generate documents in realistic handwriting.", no_args_i
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"handwriter {__version__}")
+        typer.echo(f"text2hand {__version__}")
         raise typer.Exit()
 
 
@@ -26,14 +26,14 @@ def main(
         False, "--version", callback=_version_callback, is_eager=True, help="Show version."
     ),
 ) -> None:
-    """Handwriting Replicator."""
+    """Text2Hand: personalised handwriting synthesis from a single page."""
 
 
 @app.command()
 def info() -> None:
     """Show basic configuration."""
     w, h = a4_size_px()
-    typer.echo(f"handwriter {__version__}")
+    typer.echo(f"text2hand {__version__}")
     typer.echo(f"Page: A4, {w} x {h} px at {DEFAULT_DPI} DPI")
 
 

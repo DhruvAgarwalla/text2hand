@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "handwriter"
+name = "text2hand"
 version = "0.0.1"
-description = "Generate A4 PDF/DOCX documents in realistic, imperfect handwriting, including your own."
+description = "Personalised Handwriting Synthesis from a Single Page via Stroke-Level Modelling: realistic handwritten A4 PDF/DOCX documents, including your own handwriting."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,6 +30,7 @@ dev = ["pytest>=8.0", "ruff>=0.5"]
 
 [project.scripts]
 handwriter = "handwriter.app.cli:app"
+text2hand = "handwriter.app.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
